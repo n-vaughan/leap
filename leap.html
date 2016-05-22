@@ -1,0 +1,265 @@
+<script>
+	PLAT_WIDTH = 100;
+	SPEED = 60;
+	GRAVITY = 5; // ???
+	TICKS = 0;
+
+	// Set in setup()
+	WIDTH = 0;
+	HEIGHT = 0;
+
+
+
+	function Pillars(width, height) {
+		this.width = width;
+		this.height = height;
+		var heights = new Array(((width / PLAT_WIDTH) | 0) + 1);
+		var offset = 0;
+
+		// init heights array
+		for(var i = 0; i < heights.length; i++) {
+			heights[i] = Math.random() * this.height;
+		}
+
+		this.getHeight = function(x) {
+			return heights[((x - offset) / PLAT_WIDTH) | 0];
+		};
+		this.leftBound = function(x) {
+
+	// x, y correspond to location of bottom right corner
+	function Player(x, y) {
+		this.x = x;
+		this.y = y;
+		this.grounded = true;
+		this.velx = SPEED;
+		this.vely = 0;
+
+		this.tick = function() {
+			this.x += this.velx;
+			if( ! this.grounded) {
+				// TODO
+				this.vely += GRAVITY;
+				this.y += this.vely;
+
+				// then check for grounding and zero out vely
+			}
+		};
+	}
+
+
+	function Enemy(x, width, height)
+	{
+		this.x = x;
+		this.y = 0;
+		this.width = width;
+		this.height = height;
+		this.element = sample(FULLTYPE);
+	}
+	Enemy.prototype.draw = function() {
+		var r = 0;
+		var g = 0;
+		var b = 0;
+		if(this.element[1][0] == 1)
+			r = 255;
+		if(this.element[1][1] == 1)
+			g = 255;
+		if(this.element[1][2] == 1)
+			b = 255;
+		CONTEXT.strokeStyle = "rgb(" + r + ", " + g + ", " + b + ")";
+		var len = 10;
+		if(this.element[0] == 0)
+		{
+			CONTEXT.beginPath();
+			CONTEXT.moveTo(this.x - len, this.y - len);
+			CONTEXT.lineTo(this.x + len, this.y - len);
+			CONTEXT.lineTo(this.x + len, this.y + len);
+			CONTEXT.lineTo(this.x - len, this.y + len);
+			CONTEXT.lineTo(this.x - len, this.y - len);
+			CONTEXT.stroke();
+		}
+		if(this.element[0] == 1)
+		{
+			CONTEXT.beginPath();
+			CONTEXT.moveTo(this.x - 2 * len, this.y - len);
+			CONTEXT.lineTo(this.x + 2 * len, this.y - len);
+			CONTEXT.lineTo(this.x + 2 * len, this.y + len);
+			CONTEXT.lineTo(this.x - 2 * len, this.y + len);
+			CONTEXT.lineTo(this.x - 2 * len, this.y - len);
+			CONTEXT.stroke();
+		}
+		if(this.element[0] == 2)
+		{
+			CONTEXT.beginPath();
+			CONTEXT.moveTo(this.x, this.y - len);
+			CONTEXT.lineTo(this.x - len, this.y);
+			CONTEXT.lineTo(this.x + len, this.y);
+			CONTEXT.lineTo(this.x, this.y - len);
+			CONTEXT.stroke();
+		}
+	}
+	function tick() {
+		// Add an enemy if necessary
+		tickcount++;
+
+		// Background
+		CONTEXT.fillStyle = "rgb(100, 150, 120)";
+		CONTEXT.fillRect(0, 0, WIDTH, HEIGHT);
+		// Score
+		CONTEXT.fillStyle = "rgb(0, 0, 0)";
+		CONTEXT.font = "30px Sans";
+		CONTEXT.fillText("Score: " + SCORE, 10, 40);
+
+		// Draw player
+		CONTEXT.fillStyle = "rgb(200, 190, 255)";
+		PLAYER.x = MOUSEX;
+		PLAYER.draw();
+		// Attack line
+		CONTEXT.strokeStyle = "rgb(0, 190, 255)";
+		CONTEXT.beginPath();
+		CONTEXT.moveTo(PLAYER.x + 27, PLAYER.y - 1);
+		CONTEXT.lineTo(PLAYER.x + 27, 0);
+		CONTEXT.stroke();
+
+		// Enemies
+		CONTEXT.font = "15px Sans";
+		CONTEXT.fillStyle = "rgb(200, 30, 70)";
+		for(var i = 0; i < ENEMIES.length; i++)
+		{
+			ENEMIES[i].move(1); // TODO time-based move...
+			ENEMIES[i].draw();
+		}
+
+		// Explosions
+		CONTEXT.strokeStyle = "rgb(0, 0, 0)";
+		for(var i = 0; i < EXPLOSIONS.length; i++)
+		{
+			EXPLOSIONS[i].draw();
+		}
+
+	}
+
+	function setup() {
+		var canvas = document.getElementById('c');
+		CONTEXT = canvas.getContext('2d');
+
+		WIDTH = canvas.width;
+		HEIGHT = canvas.height;
+
+		tick();
+		//setInterval(tick, 16);
+	}
+	function copy(x)
+	{
+		var rval = new Array();
+		for(var i = 0; i < x.length; i++)
+		{
+			if(x[i] instanceof Array)
+			{
+				rval.push(copy(x[i]));
+			}
+			else
+			{
+				rval.push(x[i]);
+			}
+		}
+
+		return rval;
+	}
+		
+	function stringify(x)
+	{
+		var rval = "(";
+
+		for(var i = 0; i < x.length; i++)
+		{
+			if(x[i] instanceof Array)
+			{
+				rval += stringify(x[i]);
+			}
+			else
+			{
+				rval += x[i];
+			}
+
+			if(i != (x.length - 1)) // fencepost
+				rval += ", ";
+		}
+
+		rval += ")";
+		return rval;
+	}
+	function sample(type)
+	{
+		var samp = new Array();
+		for(var i = 0; i < type.length; i++)
+		{
+			// direct sum
+			if(type[i] instanceof Array)
+			{
+				samp.push(sample(type[i]));
+			}
+			else // prime order cyclic
+			{
+				// Random int in [0, type[i] - 1]
+				var x = Math.random();
+				x *= type[i];
+				x |= 0;
+				samp.push(x);
+			}
+		}
+
+		return samp;
+	}
+	function staple(t1, t2)
+	{
+		var type = new Array();
+		for(var i = 0; i < t1.length; i++)
+			type.push(t1[i]);
+		for(var i = 0; i < t2.length; i++)
+			type.push(t2[i]);
+
+		return type;
+	}
+	function isIdentity(x)
+	{
+		for(var i = 0; i < x.length; i++)
+		{
+			if(x[i] instanceof Array)
+			{
+				if( ! isIdentity(x[i]))
+					return false;
+			}
+			else
+			{
+				if(x[i] != 0)
+					return false;
+			}
+		}
+
+		return true;
+	}
+	function add(x1, x2, type)
+	{
+		var result = new Array();
+		for(var i = 0; i < x1.length; i++)
+		{
+			// Direct sum case
+			if(x1[i] instanceof Array)
+			{
+				result.push(add(x1[i], x2[i], type[i]));
+			}
+			else // Prime-order cyclic group case
+			{
+				result.push((x1[i] + x2[i]) % type[i]);
+			}
+		}
+
+		return result;
+	}
+</script>
+<body onload="setup()" oncontextmenu="return false;">
+	<canvas id=c width=1000 height=600></canvas> <br />
+	Controls: <br />
+	Left-click to attack <br />
+	Right-click to steal <br />
+</body>
