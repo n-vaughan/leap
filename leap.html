@@ -4,11 +4,12 @@
 	// These will need tweaking
 	PLAYER_WIDTH = 20;
 	PLAYER_HEIGHT = 20;
-	PLAT_WIDTH = 100;
-	SPEED = 6;
-	GRAVITY = -0.35;
-	JUMP_VEL = 10;
-	MAX_JUMP_TICKS = 35;
+	PLAT_WIDTH = 170;
+	SPEED = 7;
+	GRAVITY = -0.30;
+	JUMP_VEL = 4;
+	MAX_JUMP_TICKS = 45;
+	MOUSE_IS_DOWN = false;
 
 	// Set in setup()
 	WIDTH = 0;
@@ -73,6 +74,9 @@
 		this.jumps = 0;
 
 		this.tick = function() {
+			if(MOUSE_IS_DOWN)
+				this.jump();
+
 			// Save to see how far we travel
 			var oldX = this.x;
 
@@ -157,6 +161,13 @@
 		window.requestAnimationFrame(tick);
 	}
 
+	function mouseDown() {
+		MOUSE_IS_DOWN = true;
+	}
+	function mouseUp() {
+		MOUSE_IS_DOWN = false;
+		PLAYER.jumps = 0;
+	}
 
 	function setup() {
 		var canvas = document.getElementById('c');
@@ -167,6 +178,9 @@
 
 		CONTEXT.translate(0, HEIGHT);
 		CONTEXT.scale(1, -1); // swap y-coordinates for sanity
+
+		canvas.onmousedown = mouseDown;
+		canvas.onmouseup = mouseUp;
 
 		PILLARS = new Pillars(WIDTH, 200);
 		var startX = (WIDTH / 2) | 0;
