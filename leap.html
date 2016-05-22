@@ -1,19 +1,28 @@
 <script>
-	PLAT_WIDTH = 100;
-	SPEED = 60;
-	GRAVITY = 5; // ???
 	TICKS = 0;
+
+	// These will need tweaking
+	PLAYER_WIDTH = 20;
+	PLAYER_HEIGHT = 20;
+	PLAT_WIDTH = 100;
+	SPEED = 6;
+	GRAVITY = -0.35;
+	JUMP_VEL = 10;
+	MAX_JUMP_TICKS = 35;
 
 	// Set in setup()
 	WIDTH = 0;
 	HEIGHT = 0;
+	PILLARS = null;
+	PLAYER = null;
 
 
 
+	// Width of the playing field; max height of a pillar
 	function Pillars(width, height) {
 		this.width = width;
 		this.height = height;
-		var heights = new Array(((width / PLAT_WIDTH) | 0) + 1);
+		var heights = new Array(((width / PLAT_WIDTH) | 0) + 2);
 		var offset = 0;
 
 		// init heights array
@@ -22,9 +31,37 @@
 		}
 
 		this.getHeight = function(x) {
-			return heights[((x - offset) / PLAT_WIDTH) | 0];
+			return heights[((x + offset) / PLAT_WIDTH) | 0];
 		};
 		this.leftBound = function(x) {
+			var trueX = x + offset;
+			return (((trueX / PLAT_WIDTH) | 0) * PLAT_WIDTH) - offset;
+		};
+		this.move = function(dist) {
+			offset += dist;
+
+			// Can we skip shifting around the array of pillar heights?
+			if(offset < PLAT_WIDTH) {
+				return;
+			}
+
+			// Don't have to worry about modulo b/c this is called every tick,
+			// and X speed is much lower than platform width
+			offset -= PLAT_WIDTH;
+			heights.shift();
+			heights.push(Math.random() * this.height);
+		};
+		this.draw = function() {
+			CONTEXT.fillStyle = "rgb(0, 0, 0)";
+			CONTEXT.save();
+				CONTEXT.translate(-offset, 0);
+				for(var i = 0; i < heights.length; i++) {
+					CONTEXT.fillRect(0, 0, PLAT_WIDTH, heights[i]);
+					CONTEXT.translate(PLAT_WIDTH, 0);
+				}
+			CONTEXT.restore();
+		};
+	}
 
 	// x, y correspond to location of bottom right corner
 	function Player(x, y) {
@@ -33,233 +70,114 @@
 		this.grounded = true;
 		this.velx = SPEED;
 		this.vely = 0;
+		this.jumps = 0;
 
 		this.tick = function() {
-			this.x += this.velx;
-			if( ! this.grounded) {
-				// TODO
-				this.vely += GRAVITY;
-				this.y += this.vely;
+			// Save to see how far we travel
+			var oldX = this.x;
 
-				// then check for grounding and zero out vely
+			// Update vel, then positions
+			this.vely += GRAVITY;
+			this.x += this.velx;
+			this.y += this.vely;
+
+			var pillarHeightR = PILLARS.getHeight(this.x);
+			var pillarHeightL = PILLARS.getHeight(this.x - PLAYER_WIDTH);
+			var pillarHeight = Math.max(pillarHeightL, pillarHeightR);
+
+			// Have we fallen onto a pillar?
+			// (check both left and right corners of Player)
+			if(this.y <= pillarHeightL) {
+				this.y = pillarHeightL;
+				this.grounded = true;
+				this.vely = 0;
+				this.jumps = 0;
+			} else {
+				this.grounded = false;
 			}
+
+			// Are we pushing into a pillar?
+			if(this.y < pillarHeightR && this.y >= pillarHeightL) {
+				this.x = PILLARS.leftBound(this.x);
+			}
+
+			// Finally, update the pillar offset with our actual X movement
+			PILLARS.move(this.x - oldX);
+
+			// Keep it in the middle, tbh
+			this.x = oldX;
+		};
+
+		this.jump = function() {
+			// If you aren't grounded, you must be executing a jump to continue jumping
+			// In the opposite situation (grounded, or non-zero jumps), continued jumping allowed
+			if(( ! this.grounded) && this.jumps == 0)
+				return;
+
+			// ... unless you've reached the max jump height
+			if(this.jumps == MAX_JUMP_TICKS) {
+				// Prevent continued jumping unless grounded
+				this.jumps = 0;
+				return;
+			}
+
+			// If we reach this point, we are allowed to jump.
+			// To "jump" is to set the velocity, rather than accel up
+			this.vely = JUMP_VEL;
+			this.jumps++;
+		};
+
+		this.draw = function() {
+			CONTEXT.fillStyle = "rgb(64, 192, 192)";
+			CONTEXT.fillRect(((WIDTH / 2) | 0) - PLAYER_WIDTH, this.y, PLAYER_WIDTH, PLAYER_HEIGHT);
 		};
 	}
 
 
-	function Enemy(x, width, height)
-	{
-		this.x = x;
-		this.y = 0;
-		this.width = width;
-		this.height = height;
-		this.element = sample(FULLTYPE);
-	}
-	Enemy.prototype.draw = function() {
-		var r = 0;
-		var g = 0;
-		var b = 0;
-		if(this.element[1][0] == 1)
-			r = 255;
-		if(this.element[1][1] == 1)
-			g = 255;
-		if(this.element[1][2] == 1)
-			b = 255;
-		CONTEXT.strokeStyle = "rgb(" + r + ", " + g + ", " + b + ")";
-		var len = 10;
-		if(this.element[0] == 0)
-		{
-			CONTEXT.beginPath();
-			CONTEXT.moveTo(this.x - len, this.y - len);
-			CONTEXT.lineTo(this.x + len, this.y - len);
-			CONTEXT.lineTo(this.x + len, this.y + len);
-			CONTEXT.lineTo(this.x - len, this.y + len);
-			CONTEXT.lineTo(this.x - len, this.y - len);
-			CONTEXT.stroke();
-		}
-		if(this.element[0] == 1)
-		{
-			CONTEXT.beginPath();
-			CONTEXT.moveTo(this.x - 2 * len, this.y - len);
-			CONTEXT.lineTo(this.x + 2 * len, this.y - len);
-			CONTEXT.lineTo(this.x + 2 * len, this.y + len);
-			CONTEXT.lineTo(this.x - 2 * len, this.y + len);
-			CONTEXT.lineTo(this.x - 2 * len, this.y - len);
-			CONTEXT.stroke();
-		}
-		if(this.element[0] == 2)
-		{
-			CONTEXT.beginPath();
-			CONTEXT.moveTo(this.x, this.y - len);
-			CONTEXT.lineTo(this.x - len, this.y);
-			CONTEXT.lineTo(this.x + len, this.y);
-			CONTEXT.lineTo(this.x, this.y - len);
-			CONTEXT.stroke();
-		}
-	}
 	function tick() {
-		// Add an enemy if necessary
-		tickcount++;
+		TICKS++;
 
-		// Background
-		CONTEXT.fillStyle = "rgb(100, 150, 120)";
+		PLAYER.tick();
+
+		// Draw background
+		CONTEXT.fillStyle = "rgb(255, 255, 255)";
 		CONTEXT.fillRect(0, 0, WIDTH, HEIGHT);
-		// Score
-		CONTEXT.fillStyle = "rgb(0, 0, 0)";
-		CONTEXT.font = "30px Sans";
-		CONTEXT.fillText("Score: " + SCORE, 10, 40);
 
+		// Draw pillars
+		PILLARS.draw();
 		// Draw player
-		CONTEXT.fillStyle = "rgb(200, 190, 255)";
-		PLAYER.x = MOUSEX;
 		PLAYER.draw();
-		// Attack line
-		CONTEXT.strokeStyle = "rgb(0, 190, 255)";
-		CONTEXT.beginPath();
-		CONTEXT.moveTo(PLAYER.x + 27, PLAYER.y - 1);
-		CONTEXT.lineTo(PLAYER.x + 27, 0);
-		CONTEXT.stroke();
 
-		// Enemies
-		CONTEXT.font = "15px Sans";
-		CONTEXT.fillStyle = "rgb(200, 30, 70)";
-		for(var i = 0; i < ENEMIES.length; i++)
-		{
-			ENEMIES[i].move(1); // TODO time-based move...
-			ENEMIES[i].draw();
-		}
 
-		// Explosions
-		CONTEXT.strokeStyle = "rgb(0, 0, 0)";
-		for(var i = 0; i < EXPLOSIONS.length; i++)
-		{
-			EXPLOSIONS[i].draw();
-		}
 
+		// Score
+		//CONTEXT.fillStyle = "rgb(0, 0, 0)";
+		//CONTEXT.font = "30px Sans";
+		//CONTEXT.fillText("Score: " + SCORE, 10, 40);
+		window.requestAnimationFrame(tick);
 	}
+
 
 	function setup() {
 		var canvas = document.getElementById('c');
 		CONTEXT = canvas.getContext('2d');
 
-		WIDTH = canvas.width;
-		HEIGHT = canvas.height;
+		WIDTH = canvas.width = document.body.scrollWidth - 40;
+		HEIGHT = canvas.height = document.body.scrollHeight - 100;
+
+		CONTEXT.translate(0, HEIGHT);
+		CONTEXT.scale(1, -1); // swap y-coordinates for sanity
+
+		PILLARS = new Pillars(WIDTH, 200);
+		var startX = (WIDTH / 2) | 0;
+		PLAYER = new Player(startX, PILLARS.getHeight(startX));
 
 		tick();
-		//setInterval(tick, 16);
-	}
-	function copy(x)
-	{
-		var rval = new Array();
-		for(var i = 0; i < x.length; i++)
-		{
-			if(x[i] instanceof Array)
-			{
-				rval.push(copy(x[i]));
-			}
-			else
-			{
-				rval.push(x[i]);
-			}
-		}
-
-		return rval;
-	}
-		
-	function stringify(x)
-	{
-		var rval = "(";
-
-		for(var i = 0; i < x.length; i++)
-		{
-			if(x[i] instanceof Array)
-			{
-				rval += stringify(x[i]);
-			}
-			else
-			{
-				rval += x[i];
-			}
-
-			if(i != (x.length - 1)) // fencepost
-				rval += ", ";
-		}
-
-		rval += ")";
-		return rval;
-	}
-	function sample(type)
-	{
-		var samp = new Array();
-		for(var i = 0; i < type.length; i++)
-		{
-			// direct sum
-			if(type[i] instanceof Array)
-			{
-				samp.push(sample(type[i]));
-			}
-			else // prime order cyclic
-			{
-				// Random int in [0, type[i] - 1]
-				var x = Math.random();
-				x *= type[i];
-				x |= 0;
-				samp.push(x);
-			}
-		}
-
-		return samp;
-	}
-	function staple(t1, t2)
-	{
-		var type = new Array();
-		for(var i = 0; i < t1.length; i++)
-			type.push(t1[i]);
-		for(var i = 0; i < t2.length; i++)
-			type.push(t2[i]);
-
-		return type;
-	}
-	function isIdentity(x)
-	{
-		for(var i = 0; i < x.length; i++)
-		{
-			if(x[i] instanceof Array)
-			{
-				if( ! isIdentity(x[i]))
-					return false;
-			}
-			else
-			{
-				if(x[i] != 0)
-					return false;
-			}
-		}
-
-		return true;
-	}
-	function add(x1, x2, type)
-	{
-		var result = new Array();
-		for(var i = 0; i < x1.length; i++)
-		{
-			// Direct sum case
-			if(x1[i] instanceof Array)
-			{
-				result.push(add(x1[i], x2[i], type[i]));
-			}
-			else // Prime-order cyclic group case
-			{
-				result.push((x1[i] + x2[i]) % type[i]);
-			}
-		}
-
-		return result;
+		//setInterval(tick, 100);
 	}
 </script>
+
 <body onload="setup()" oncontextmenu="return false;">
-	<canvas id=c width=1000 height=600></canvas> <br />
-	Controls: <br />
-	Left-click to attack <br />
-	Right-click to steal <br />
+	Click to jump; hold to jump higher! <br />
+	<canvas id=c width=1000 height=600></canvas>
 </body>
