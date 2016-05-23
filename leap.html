@@ -10,6 +10,10 @@
 	JUMP_VEL = 4;
 	MAX_JUMP_TICKS = 45;
 	MOUSE_IS_DOWN = false;
+	PEAK_SCORE = 0;
+	PEAK_TIME = null;
+	SCORE_MULT = 1000000;
+	GAME_OVER = false;
 
 	// Set in setup()
 	WIDTH = 0;
@@ -23,6 +27,7 @@
 	function Pillars(width, height) {
 		this.width = width;
 		this.height = height;
+		this.totalDistance = 0;
 		var heights = new Array(((width / PLAT_WIDTH) | 0) + 2);
 		var offset = 0;
 
@@ -39,6 +44,7 @@
 			return (((trueX / PLAT_WIDTH) | 0) * PLAT_WIDTH) - offset;
 		};
 		this.move = function(dist) {
+			this.totalDistance += dist;
 			offset += dist;
 
 			// Can we skip shifting around the array of pillar heights?
@@ -139,8 +145,32 @@
 
 
 	function tick() {
-		TICKS++;
+		if(GAME_OVER) {
+			CONTEXT.fillStyle = "rgb(255, 255, 255)";
+			CONTEXT.fillRect(0, 0, WIDTH, HEIGHT);
 
+			// Draw score
+			CONTEXT.fillStyle = "rgb(0, 0, 0)";
+			CONTEXT.font = "30px Sans";
+			CONTEXT.save();
+				CONTEXT.scale(1, -1);
+				CONTEXT.translate(0, -HEIGHT);
+				CONTEXT.textAlign = "center"
+				CONTEXT.fillText("You have peaked, with a", WIDTH/2, (HEIGHT/2) - 35);
+				CONTEXT.fillText("peak score of " + PEAK_SCORE + "!", WIDTH/2, HEIGHT/2);
+				CONTEXT.font = "10px Sans";
+				CONTEXT.fillText("Game Over :(", WIDTH / 2, (HEIGHT / 2) + 100);
+				CONTEXT.font = "20px Sans";
+				CONTEXT.fillText("Right click to restart", WIDTH / 2, (HEIGHT / 2) + 150);
+			CONTEXT.restore();
+
+			return;
+		}
+
+
+
+
+		TICKS++;
 		PLAYER.tick();
 
 		// Draw background
@@ -152,21 +182,59 @@
 		// Draw player
 		PLAYER.draw();
 
+		// Calculate score
+		// 30s stopped = x0; 0s stopped = x1
+		var effMult = 1 - (((SPEED * TICKS) - PILLARS.totalDistance) / (60 * 30)); // Assumes 60fps
+		effMult = Math.max(0, effMult);
+		effMult = Math.sqrt(effMult);
+
+		// distMult peaks at 1x
+		var distMult = PILLARS.totalDistance;
+		distMult = 1 - (1 / (0.00001 * distMult + 1));
+
+		var score = (distMult * effMult * SCORE_MULT) | 0;
+		if(score > PEAK_SCORE) {
+			PEAK_SCORE = score;
+			PEAK_TIME = new Date();
+		}
+
+		// Draw score
+		CONTEXT.fillStyle = "rgb(32, 128, 256)";
+		CONTEXT.font = "30px Sans";
+		CONTEXT.save();
+			CONTEXT.scale(1, -1);
+			CONTEXT.translate(0, -HEIGHT);
+			CONTEXT.fillText("Score: " + score, 10, 40);
+			CONTEXT.fillText("Peak: " + PEAK_SCORE, 10, 90);
+		CONTEXT.restore();
 
 
-		// Score
-		//CONTEXT.fillStyle = "rgb(0, 0, 0)";
-		//CONTEXT.font = "30px Sans";
-		//CONTEXT.fillText("Score: " + SCORE, 10, 40);
+		if(PEAK_SCORE > effMult * SCORE_MULT)
+			GAME_OVER = true;
 		window.requestAnimationFrame(tick);
 	}
 
-	function mouseDown() {
+	function mouseDown(evt) {
+		if(evt.button == 2 && GAME_OVER) {
+			reset();
+			return;
+		}
 		MOUSE_IS_DOWN = true;
 	}
 	function mouseUp() {
 		MOUSE_IS_DOWN = false;
 		PLAYER.jumps = 0;
+	}
+
+	function reset() {
+		TICKS = 0;
+		PEAK_SCORE = 0;
+
+		PILLARS = new Pillars(WIDTH, 200);
+		var startX = (WIDTH / 2) | 0;
+		PLAYER = new Player(startX, PILLARS.getHeight(startX));
+		GAME_OVER = false;
+		tick();
 	}
 
 	function setup() {
@@ -182,12 +250,7 @@
 		canvas.onmousedown = mouseDown;
 		canvas.onmouseup = mouseUp;
 
-		PILLARS = new Pillars(WIDTH, 200);
-		var startX = (WIDTH / 2) | 0;
-		PLAYER = new Player(startX, PILLARS.getHeight(startX));
-
-		tick();
-		//setInterval(tick, 100);
+		reset();
 	}
 </script>
 
